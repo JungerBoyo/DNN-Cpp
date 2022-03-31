@@ -86,7 +86,7 @@ namespace AD
             }   
 
             private:
-                bool _rectified;
+                const bool _rectified;
                 std::shared_ptr<Var<T>> _arg { nullptr };
         };
     }
