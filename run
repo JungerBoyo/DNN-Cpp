@@ -1,1 +1,1 @@
-(cd . && exec build/VkGradientDescent)
+(cd . && exec build/src/VkGradientDescent)

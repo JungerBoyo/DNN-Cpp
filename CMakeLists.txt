@@ -8,13 +8,4 @@ include_directories(
     src/AD
 )
 
-
-add_executable(${PROJECT_NAME} 
-    src/ADtest.cpp
-    src/AD/ADVar.hpp
-)
-
-
-target_link_libraries(${PROJECT_NAME} 
-    fmt
-)
+add_subdirectory(src)

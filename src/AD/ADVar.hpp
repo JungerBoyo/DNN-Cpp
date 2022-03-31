@@ -19,76 +19,121 @@ namespace AD
         virtual void Evaluate(){}
     };
 
-    template<typename T>
-    struct OpAdd : public Var<T>
-    {   
-        OpAdd(std::shared_ptr<Var<T>> lhsArg, std::shared_ptr<Var<T>> rhsArg)
-            : _lhsArg(std::move(lhsArg)), _rhsArg(std::move(rhsArg))
-        {
-            this->value = _lhsArg->value + _rhsArg->value;
-        }
-
-        void Evaluate() override
-        {
-            _rhsArg->primValue += this->primValue; // * 1
-            _lhsArg->primValue += this->primValue; // * 1
-
-            _rhsArg->Evaluate();
-            _lhsArg->Evaluate();
-        }
-
-        private:
-            std::shared_ptr<Var<T>> _lhsArg { nullptr };
-            std::shared_ptr<Var<T>> _rhsArg { nullptr };
-    };
-
-    template<typename T>
-    struct OpMul : public Var<T>
+    namespace Op
     {
-        OpMul(std::shared_ptr<Var<T>> lhsArg, std::shared_ptr<Var<T>> rhsArg)
-            : _lhsArg(std::move(lhsArg)), _rhsArg(std::move(rhsArg))
+        template<typename T>
+        struct Add : public Var<T>
+        {   
+            Add(std::shared_ptr<Var<T>> lhsArg, std::shared_ptr<Var<T>> rhsArg)
+                : _lhsArg(std::move(lhsArg)), _rhsArg(std::move(rhsArg))
+            {
+                this->value = _lhsArg->value + _rhsArg->value;
+            }
+
+            void Evaluate() override
+            {
+                _rhsArg->primValue += this->primValue; // * 1
+                _lhsArg->primValue += this->primValue; // * 1
+
+                _rhsArg->Evaluate();
+                _lhsArg->Evaluate();
+            }
+
+            private:
+                std::shared_ptr<Var<T>> _lhsArg { nullptr };
+                std::shared_ptr<Var<T>> _rhsArg { nullptr };
+        };
+
+        template<typename T>
+        struct Mul : public Var<T>
         {
-            this->value = _lhsArg->value * _rhsArg->value;
-        }
+            Mul(std::shared_ptr<Var<T>> lhsArg, std::shared_ptr<Var<T>> rhsArg)
+                : _lhsArg(std::move(lhsArg)), _rhsArg(std::move(rhsArg))
+            {
+                this->value = _lhsArg->value * _rhsArg->value;
+            }
 
-        void Evaluate() override
+            void Evaluate() override
+            {
+                _rhsArg->primValue += this->primValue * _lhsArg->value;
+                _lhsArg->primValue += this->primValue * _rhsArg->value;
+
+                _rhsArg->Evaluate();
+                _lhsArg->Evaluate();
+            }
+
+            private:
+                std::shared_ptr<Var<T>> _lhsArg { nullptr };
+                std::shared_ptr<Var<T>> _rhsArg { nullptr };
+        };
+
+        template<typename T>
+        struct ReLU : public Var<T>
         {
-            _rhsArg->primValue += this->primValue * _lhsArg->value;
-            _lhsArg->primValue += this->primValue * _rhsArg->value;
+            ReLU(std::shared_ptr<Var<T>> arg)
+                : _rectified(arg->value <= static_cast<T>(0)),
+                  _arg(std::move(arg))                
+            {
+                this->value = _rectified ? static_cast<T>(0) : _arg->value;
+            }
 
-            _rhsArg->Evaluate();
-            _lhsArg->Evaluate();
-        }
+            void Evaluate() override
+            {
+                if(!_rectified)
+                    _arg->primValue += this->primValue; // * 1
 
-        private:
-            std::shared_ptr<Var<T>> _lhsArg { nullptr };
-            std::shared_ptr<Var<T>> _rhsArg { nullptr };
-    };
+                _arg->Evaluate();
+            }   
+
+            private:
+                bool _rectified;
+                std::shared_ptr<Var<T>> _arg { nullptr };
+        };
+    }
+
+/**
+ * operators for adjoint
+ */
 
     template<typename T>
-    constexpr std::shared_ptr<Var<T>> operator*(std::shared_ptr<Var<T>> lhs, std::shared_ptr<Var<T>> rhs)
+    std::shared_ptr<Var<T>> operator*(std::shared_ptr<Var<T>> lhs, std::shared_ptr<Var<T>> rhs)
     {
-        return std::make_shared<OpMul<T>>(lhs, rhs);
+        return std::make_shared<Op::Mul<T>>(lhs, rhs);
     }  
 
     template<typename T>
-    constexpr std::shared_ptr<Var<T>> operator+(std::shared_ptr<Var<T>> lhs, std::shared_ptr<Var<T>> rhs)
+    std::shared_ptr<Var<T>> operator+(std::shared_ptr<Var<T>> lhs, std::shared_ptr<Var<T>> rhs)
     {
-        return std::make_shared<OpAdd<T>>(lhs, rhs);
+        return std::make_shared<Op::Add<T>>(lhs, rhs);
     }  
 
     template<typename T>
-    constexpr std::shared_ptr<Var<T>> operator*(T lhs, std::shared_ptr<Var<T>> rhs)
+    std::shared_ptr<Var<T>> operator*(T lhs, std::shared_ptr<Var<T>> rhs)
     {
-        return std::make_shared<OpMul<T>>(std::make_shared<Var<T>>(lhs), rhs);
+        return std::make_shared<Op::Mul<T>>(std::make_shared<Var<T>>(lhs), rhs);
     }  
 
     template<typename T>
-    constexpr std::shared_ptr<Var<T>> operator+(std::shared_ptr<Var<T>> lhs, T rhs)
+    std::shared_ptr<Var<T>> operator+(std::shared_ptr<Var<T>> lhs, T rhs)
     {
-        return std::make_shared<OpAdd<T>>(lhs, std::make_shared<Var<T>>(rhs));
+        return std::make_shared<Op::Add<T>>(lhs, std::make_shared<Var<T>>(rhs));
     }  
 
+    template<typename T>
+    std::shared_ptr<Var<T>> ReLU(Var<T> arg)
+    {
+        return std::make_shared<Op::ReLU<T>>(std::make_shared<Var<T>>(arg));
+    }
+
+    template<typename T>
+    std::shared_ptr<Var<T>> ReLU(std::shared_ptr<Var<T>> arg)
+    {
+        return std::make_shared<Op::ReLU<T>>(arg);
+    }
+
+/**
+ * operators for tangent
+ */
     template<typename T>
     constexpr Var<T> operator*(Var<T> lhs, Var<T> rhs)
     {

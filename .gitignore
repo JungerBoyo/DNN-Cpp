@@ -3,3 +3,5 @@ res/
 src/main.cpp
 shaders/
 *.code-workspace
+.vscode
+buildDBG
